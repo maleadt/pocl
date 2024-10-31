@@ -36,9 +36,11 @@
 #include <ucontext.h>
 #endif
 
-#ifndef _WIN32
+#ifndef _MSC_VER
 #  include <unistd.h>
-#else
+#endif
+
+#ifndef _WIN32
 #  include "vccompat.hpp"
 #endif
 
@@ -294,16 +296,36 @@ get_pocl_device_lib_path (char *result, char *device_name, int absolute_path)
               strcat (result, POCL_INSTALL_PRIVATE_LIBDIR_REL);
             }
           strcat (result, POCL_PATH_SEPARATOR);
+#ifdef _WIN32
+          strcat (result, "pocl-devices-");
+#else
           strcat (result, "libpocl-devices-");
+#endif
           strcat (result, device_name);
+#if defined(_WIN32)
+          strcat (result, ".dll");
+#elif defined(__APPLE__)
+          strcat (result, ".dylib");
+#else
           strcat (result, ".so");
+#endif
         }
     }
   else
     {
+#ifdef _WIN32
+      strcat (result, "pocl-devices-");
+#else
       strcat (result, "libpocl-devices-");
+#endif
       strcat (result, device_name);
+#if defined(_WIN32)
+      strcat (result, ".dll");
+#elif defined(__APPLE__)
+      strcat (result, ".dylib");
+#else
       strcat (result, ".so");
+#endif
     }
 }
 #endif

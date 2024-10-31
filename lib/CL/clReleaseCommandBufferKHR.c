@@ -25,11 +25,7 @@
 #include "pocl_mem_management.h"
 #include "pocl_util.h"
 
-#if defined(__FreeBSD__)
-#include <stdlib.h>
-#else
-#include <alloca.h>
-#endif
+#include <malloc.h>
 
 CL_API_ENTRY cl_int CL_API_CALL
 POname (clReleaseCommandBufferKHR) (cl_command_buffer_khr command_buffer)

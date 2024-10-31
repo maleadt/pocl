@@ -143,4 +143,8 @@ static int posix_memalign(void **p, size_t align, size_t size) {
 #define alloca _alloca
 #endif
 
+#ifdef __MINGW32__
+#define setenv(name, value, overwrite) _putenv_s(name, value)
+#endif
+
 #endif

@@ -30,6 +30,10 @@
 #define NB_WORK_GROUP 32
 #define VEC_SIZE 32
 
+#ifdef _WIN32
+#  include "vccompat.hpp"
+#endif
+
 const char *kernelSource =
   "__kernel void test(__global unsigned * restrict buffer,          "
   "                   __local unsigned * restrict local_input,      "

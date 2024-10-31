@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef _WIN32
+#ifdef _MSC_VER
 #  include <stdint.h>
 #  include <stddef.h> // size_t
 #  define PRIu64 "I64u"

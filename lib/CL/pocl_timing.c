@@ -23,7 +23,7 @@
 
 #include "config.h"
 
-#ifndef _WIN32
+#ifndef _MSC_VER
 #  define _DEFAULT_SOURCE
 #  define __POSIX_VISIBLE 200112L
 #  ifndef _POSIX_C_SOURCE
@@ -39,12 +39,15 @@
 #    include <mach/clock.h>
 #    include <mach/mach.h>
 #  endif
-#  include <sys/resource.h>
 #  include <unistd.h>
 #else
 #  include "vccompat.hpp"
 #  include <stdint.h>
 #  include <stddef.h> // size_t
+#endif
+
+#ifndef _WIN32
+#  include <sys/resource.h>
 #endif
 
 #include "pocl_timing.h"

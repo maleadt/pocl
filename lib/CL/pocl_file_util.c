@@ -65,8 +65,12 @@ pocl_rm_rf(const char* path)
                 POCL_ABORT ("Can't get stat() on %s\n", buf);
               if (S_ISDIR (statbuf.st_mode))
                 error = pocl_rm_rf (buf);
-              if (S_ISREG (statbuf.st_mode) || S_ISLNK (statbuf.st_mode))
+              if (S_ISREG (statbuf.st_mode))
                 error = remove (buf);
+#ifndef _WIN32
+              if (S_ISLNK (statbuf.st_mode))
+                error = remove (buf);
+#endif
 
               free(buf);
             }
@@ -168,7 +172,7 @@ pocl_read_file(const char* path, char** content, uint64_t *filesize)
   if (ptr == NULL)
     return -1;
 
-  FILE *f = fopen (path, "r");
+  FILE *f = fopen (path, "rb");
   if (f == NULL) {
     POCL_MSG_ERR ("fopen( %s ) failed\n", path);
     goto ERROR;
@@ -270,8 +274,33 @@ pocl_mk_tempname (char *output, const char *prefix, const char *suffix,
                   int *ret_fd)
 {
 #if defined(_WIN32)
-  char buf[256];
-  int ok = GetTempFileName(getenv("TEMP"), prefix, 0, buf);
+  /* Extract the directory and filename parts from prefix */
+  char dir[MAX_PATH];
+  char fname_prefix[MAX_PATH];
+  const char *last_separator = strrchr(prefix, '\\');  /* Try Windows separator first */
+  if (!last_separator)
+    last_separator = strrchr(prefix, '/');  /* Also check for forward slash */
+
+  if (last_separator) {
+    /* Prefix contains a path - use it */
+    strncpy(dir, prefix, last_separator - prefix);
+    dir[last_separator - prefix] = '\0';
+    strncpy(fname_prefix, last_separator + 1, MAX_PATH - 1);
+  } else {
+    /* No path separator found, use TEMP directory */
+    const char *temp = getenv("TEMP");
+    strncpy(dir, temp ? temp : ".", MAX_PATH - 1);
+    strncpy(fname_prefix, prefix, MAX_PATH - 1);
+  }
+
+  char buf[MAX_PATH];
+  int ok = GetTempFileName(dir, fname_prefix, 0, buf);
+  if (ok) {
+    strcpy(output, buf);
+    if (ret_fd) {
+      *ret_fd = _open(buf, _O_RDWR | _O_BINARY | _O_CREAT, _S_IREAD | _S_IWRITE);
+    }
+  }
   return ok ? 0 : 1;
 #elif defined(HAVE_MKOSTEMPS) || defined(HAVE_MKSTEMPS) || defined(__ANDROID__)
   /* using mkstemp() instead of tmpnam() has no real benefit

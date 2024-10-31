@@ -1778,29 +1778,76 @@ int
 pocl_run_command (const char **args)
 {
   POCL_MSG_PRINT_INFO ("Launching: %s\n", args[0]);
-#ifdef HAVE_VFORK
-  pid_t p = vfork ();
-#elif defined(HAVE_FORK)
-  pid_t p = fork ();
-#elif _WIN32
+#if defined(_WIN32)
   STARTUPINFO si;
   ZeroMemory(&si, sizeof(si));
   si.cb = sizeof(si);
   PROCESS_INFORMATION pi;
   ZeroMemory(&pi, sizeof(pi));
   DWORD dwProcessFlags = 0;
-  char * cmd = strdup(args[0]);
-  int p = CreateProcess(NULL, cmd, NULL, NULL, 1, dwProcessFlags, NULL, NULL, &si, &pi) != 0;
-  if (!p)
+
+  // Calculate required buffer size for all arguments
+  size_t total_len = 0;
+  for (const char **arg = args; *arg != NULL; arg++) {
+    // Account for spaces, quotes, and worst-case escaping
+    total_len += strlen(*arg) * 2 + 3;
+  }
+
+  char *cmd = (char*)malloc(total_len);
+  if (!cmd) return EXIT_FAILURE;
+  cmd[0] = '\0';
+
+  // Build command line with proper escaping
+  for (const char **arg = args; *arg != NULL; arg++) {
+    if (arg != args) strcat(cmd, " "); // Add space between arguments
+
+    // Check if we need quotes (contains space or empty)
+    int needs_quotes = (strchr(*arg, ' ') != NULL) || (*arg[0] == '\0');
+
+    if (needs_quotes) strcat(cmd, "\"");
+
+    // Copy and escape argument
+    char *dst = cmd + strlen(cmd);
+    for (const char *src = *arg; *src != '\0'; src++) {
+      // Escape quotes with backslash
+      if (*src == '"') {
+        *dst++ = '\\';
+      }
+      *dst++ = *src;
+    }
+    *dst = '\0';
+
+    if (needs_quotes) strcat(cmd, "\"");
+  }
+
+  POCL_MSG_PRINT_INFO ("Running command: %s\n", cmd);
+  int success = CreateProcess(NULL, cmd, NULL, NULL, TRUE,
+                            dwProcessFlags, NULL, NULL, &si, &pi);
+  free(cmd);
+
+  if (!success)
     return EXIT_FAILURE;
+
   DWORD waitRc = WaitForSingleObject(pi.hProcess, INFINITE);
   if (waitRc == WAIT_FAILED)
     return EXIT_FAILURE;
+
   DWORD exit_code = 0;
-  p = GetExitCodeProcess(pi.hProcess, &exit_code) != 0;
-  if (!p)
+  success = GetExitCodeProcess(pi.hProcess, &exit_code);
+
+  // Clean up handles
+  CloseHandle(pi.hProcess);
+  CloseHandle(pi.hThread);
+
+  if (!success)
     return EXIT_FAILURE;
+
   return exit_code;
+#else
+#ifdef HAVE_VFORK
+  pid_t p = vfork ();
+#elif defined(HAVE_FORK)
+  pid_t p = fork ();
 #else
 #error Must have fork() or vfork() system calls for HSA
 #endif
@@ -1826,6 +1873,7 @@ pocl_run_command (const char **args)
       else
         return EXIT_FAILURE;
     }
+#endif
 }
 
 int
@@ -1835,6 +1883,95 @@ pocl_run_command_capture_output (char *capture_string,
 {
   POCL_MSG_PRINT_INFO ("Launching: %s\n", args[0]);
 
+#if defined(_WIN32)
+  HANDLE hChildStdInRead, hChildStdInWrite;
+  HANDLE hChildStdOutRead, hChildStdOutWrite;
+  SECURITY_ATTRIBUTES saAttr;
+
+  saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+  saAttr.bInheritHandle = TRUE;
+  saAttr.lpSecurityDescriptor = NULL;
+
+  if (!CreatePipe(&hChildStdOutRead, &hChildStdOutWrite, &saAttr, 0) ||
+      !CreatePipe(&hChildStdInRead, &hChildStdInWrite, &saAttr, 0))
+    return EXIT_FAILURE;
+
+  STARTUPINFO si;
+  ZeroMemory(&si, sizeof(si));
+  si.cb = sizeof(si);
+  si.hStdInput = hChildStdInRead;
+  si.hStdOutput = hChildStdOutWrite;
+  si.hStdError = hChildStdOutWrite;
+  si.dwFlags |= STARTF_USESTDHANDLES;
+
+  PROCESS_INFORMATION pi;
+  ZeroMemory(&pi, sizeof(pi));
+
+  // Calculate required length for command line
+  size_t cmd_len = 0;
+  for (const char **arg = args; *arg != NULL; arg++) {
+    // Space between arguments + quotes if needed + argument
+    cmd_len += strlen(*arg) + 3;
+  }
+
+  char *cmd = (char*)malloc(cmd_len);
+  if (!cmd) return EXIT_FAILURE;
+
+  // Build command line string with proper quoting
+  char *p = cmd;
+  for (const char **arg = args; *arg != NULL; arg++) {
+    if (arg != args) *p++ = ' ';  // Add space between arguments
+
+    // Check if argument needs quotes (contains spaces or special chars)
+    int needs_quotes = (strchr(*arg, ' ') != NULL || strchr(*arg, '\t') != NULL);
+
+    if (needs_quotes) *p++ = '"';
+    strcpy(p, *arg);
+    p += strlen(*arg);
+    if (needs_quotes) *p++ = '"';
+  }
+  *p = '\0';
+
+  POCL_MSG_PRINT_INFO ("Running command and capturing output: %s\n", cmd);
+  int p_status = CreateProcess(NULL, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi) != 0;
+  free(cmd);
+
+  if (!p_status)
+    return EXIT_FAILURE;
+
+  CloseHandle(hChildStdInRead);
+  CloseHandle(hChildStdOutWrite);
+
+  size_t total_bytes = 0;
+  size_t capture_limit = *captured_bytes;
+  char buf[4096];
+  DWORD bytes_read;
+
+  while (ReadFile(hChildStdOutRead, buf, 4096, &bytes_read, NULL) && bytes_read > 0)
+    {
+      if (total_bytes + bytes_read > capture_limit)
+        break;
+      memcpy(capture_string + total_bytes, buf, bytes_read);
+      total_bytes += bytes_read;
+    }
+
+  if (total_bytes > capture_limit)
+    total_bytes = capture_limit;
+
+  capture_string[total_bytes] = 0;
+  *captured_bytes = total_bytes;
+
+  DWORD exit_code = 0;
+  WaitForSingleObject(pi.hProcess, INFINITE);
+  GetExitCodeProcess(pi.hProcess, &exit_code);
+
+  CloseHandle(hChildStdOutRead);
+  CloseHandle(hChildStdInWrite);
+  CloseHandle(pi.hProcess);
+  CloseHandle(pi.hThread);
+
+  return exit_code;
+#else
   int in[2];
   int out[2];
   pipe (in);
@@ -1902,6 +2039,7 @@ pocl_run_command_capture_output (char *capture_string,
       else
         return EXIT_FAILURE;
     }
+#endif
 }
 
 void

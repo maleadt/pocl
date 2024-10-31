@@ -86,7 +86,7 @@ macro(pass_through_cpack_vars)
 endmacro()
 
 # don't allow implicit function declarations
-if(UNIX)
+if(UNIX OR MINGW)
   if((CMAKE_C_COMPILER_ID STREQUAL "GNU") OR
      (CMAKE_C_COMPILER_ID STREQUAL "Clang") OR
       (CMAKE_C_COMPILER_ID STREQUAL "AppleClang"))
@@ -399,11 +399,22 @@ set(COMMAND_USES_TERMINAL USES_TERMINAL)
 
 include(GNUInstallDirs)
 
-# for libpocl.so
-set(POCL_INSTALL_PUBLIC_LIBDIR "${CMAKE_INSTALL_FULL_LIBDIR}" CACHE PATH "POCL public libdir")
+# for (lib)pocl.(so|dll|dylib)
+if(WIN32)
+  set(POCL_INSTALL_PUBLIC_LIBDIR "${CMAKE_INSTALL_FULL_BINDIR}" CACHE PATH "POCL public libdir")
+else()
+  set(POCL_INSTALL_PUBLIC_LIBDIR "${CMAKE_INSTALL_FULL_LIBDIR}" CACHE PATH "POCL public libdir")
+endif()
 
-# for libpocl-devices-*.so
-set(POCL_INSTALL_PRIVATE_LIBDIR "${CMAKE_INSTALL_FULL_LIBDIR}/pocl" CACHE PATH "POCL private libdir")
+# for (lib)pocl-devices-*.(so|dll|dylib)
+set(POCL_INSTALL_PRIVATE_LIBDIR "${POCL_INSTALL_PUBLIC_LIBDIR}/pocl" CACHE PATH "POCL private libdir")
+
+# for libpocl.(a|dll.a)
+if(WIN32)
+  set(POCL_INSTALL_STATIC_LIBDIR "${CMAKE_INSTALL_FULL_LIBDIR}" CACHE PATH "POCL public libdir")
+else()
+  set(POCL_INSTALL_STATIC_LIBDIR "${POCL_INSTALL_PUBLIC_LIBDIR}/static" CACHE PATH "POCL public libdir")
+endif()
 
 # for pocl.icd
 set(POCL_INSTALL_ICD_VENDORDIR "${CMAKE_INSTALL_FULL_SYSCONFDIR}/OpenCL/vendors" CACHE PATH "POCL ICD file destination")
@@ -651,7 +662,7 @@ endif()
 
 ######################################################################################
 
-if(UNIX)
+if(UNIX OR MINGW)
   include(CheckCSourceCompiles)
   include(CheckSymbolExists)
 
@@ -970,6 +981,13 @@ set(HAVE_DLFCN_H OFF CACHE BOOL "dlopen" FORCE)
 
 if(WIN32 AND (NOT MINGW))
   message(STATUS "Using LoadLibrary/FreeLibrary in Windows, libltdl not needed.")
+
+elseif(MINGW)
+  message(STATUS "Using dlfcn-win32.")
+  find_package(dlfcn-win32 REQUIRED)
+  set(CMAKE_DL_LIBS dlfcn-win32::dl)
+  set(HAVE_DLFCN_H ON CACHE BOOL "dlfcn.h" FORCE)
+  include_directories(${dlfcn-win32_INCLUDE_DIRS})
 
 elseif(UNIX)
 
@@ -2060,7 +2078,7 @@ endif()
 
 ##########################################################
 
-if(UNIX)
+if(UNIX OR MINGW)
 
   configure_file("${CMAKE_SOURCE_DIR}/pocl.pc.in.cmake" "${CMAKE_BINARY_DIR}/pocl.pc" @ONLY)
   install(FILES "${CMAKE_BINARY_DIR}/pocl.pc"

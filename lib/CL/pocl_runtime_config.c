@@ -29,16 +29,74 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef __WIN32__
+
+#include <windows.h>
+
+static const char *
+getenvw(const char *key) {
+  // Convert key to wide char
+  size_t len = strlen(key) + 1;
+  wchar_t *wkey = (wchar_t*)malloc(len * sizeof(wchar_t));
+  if (!wkey) {
+    return NULL;
+  }
+  mbstowcs(wkey, key, len);
+
+  unsigned long size = GetEnvironmentVariableW(wkey, NULL, 0);
+  if (size == 0) {
+    free(wkey);
+    return NULL;
+  }
+
+  wchar_t *wval = (wchar_t*)malloc(size * sizeof(wchar_t));
+  if (!wval) {
+    free(wkey);
+    return NULL;
+  }
+
+  if (GetEnvironmentVariableW(wkey, wval, size) == 0) {
+    free(wkey);
+    free(wval);
+    return NULL;
+  }
+
+  free(wkey);
+
+  size_t needed = wcstombs(NULL, wval, 0) + 1;
+  char *result = (char*)malloc(needed);
+  if (!result) {
+    free(wval);
+    return NULL;
+  }
+
+  wcstombs(result, wval, needed);
+  free(wval);
+  return result;  // Still leaks to match getenv behavior
+}
+#endif
+
 /* Can be used to query if the given option has been set by the user. */
 int pocl_is_option_set(const char *key)
 {
-  return getenv (key) != NULL ? 1 : 0;
+  const char* val =
+#ifdef __WIN32__
+    getenvw(key);
+#else
+    getenv(key);
+#endif
+  return val != NULL ? 1 : 0;
 }
 
 /* Returns an integer value for the option with the given key string. */
 int pocl_get_int_option(const char *key, int default_value)
 {
-  const char *val = getenv (key);
+  const char* val =
+#ifdef __WIN32__
+    getenvw(key);
+#else
+    getenv(key);
+#endif
   return val ? atoi (val) : default_value;
 }
 
@@ -46,7 +104,12 @@ int pocl_get_int_option(const char *key, int default_value)
 int
 pocl_get_bool_option (const char *key, int default_value)
 {
-  const char *val = getenv (key);
+  const char* val =
+#ifdef __WIN32__
+    getenvw(key);
+#else
+    getenv(key);
+#endif
   if (val != NULL)
     return (strncmp (val, "1", 1) == 0);
   return default_value;
@@ -55,7 +118,12 @@ pocl_get_bool_option (const char *key, int default_value)
 const char *
 pocl_get_string_option (const char *key, const char *default_value)
 {
-  const char *val = getenv (key);
+  const char *val =
+#ifdef __WIN32__
+    getenvw(key);
+#else
+    getenv(key);
+#endif
   return val != NULL ? val : default_value;
 }
 
@@ -76,7 +144,12 @@ pocl_get_args (const char *name, int *n)
 {
   char key[256];
   snprintf (key, sizeof (key), "POCL_ARGS_%s", name);
-  const char *val = getenv (key);
+  const char *val =
+#ifdef __WIN32__
+    getenvw(key);
+#else
+    getenv(key);
+#endif
   if (val == NULL)
     {
       *n = 0;

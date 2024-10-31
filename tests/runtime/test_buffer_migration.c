@@ -27,6 +27,10 @@
 #include "config.h"
 #include "poclu.h"
 
+#ifdef _WIN32
+#  include "vccompat.hpp"
+#endif
+
 /*
   Multi-device migration test. Creates two buffers (in & out),
   enqueues the same kernel with different parameters on every device from 0 to

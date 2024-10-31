@@ -44,16 +44,22 @@
 #include "pocl_cl.h"
 #include "pocl_runtime_config.h"
 
-#define POCL_LAST_ACCESSED_FILENAME "/last_accessed"
+#ifndef _WIN32
+#define PATH_SEPARATOR "/"
+#else
+#define PATH_SEPARATOR "\\"
+#endif
+
+#define POCL_LAST_ACCESSED_FILENAME PATH_SEPARATOR "last_accessed"
 /* The filename in which the program's build log is stored */
-#define POCL_BUILDLOG_FILENAME      "/build.log"
+#define POCL_BUILDLOG_FILENAME      PATH_SEPARATOR "build.log"
 /* The filename in which the program source is stored in the program's temp
  * dir. */
-#define POCL_PROGRAM_CL_FILENAME "/program.cl"
+#define POCL_PROGRAM_CL_FILENAME PATH_SEPARATOR "program.cl"
 /* The filename in which the program LLVM bc is stored in the program's temp
  * dir. */
-#define POCL_PROGRAM_BC_FILENAME "/program.bc"
-#define POCL_PROGRAM_SPV_FILENAME "/program.spv"
+#define POCL_PROGRAM_BC_FILENAME PATH_SEPARATOR "program.bc"
+#define POCL_PROGRAM_SPV_FILENAME PATH_SEPARATOR "program.spv"
 
 static char cache_topdir[POCL_MAX_PATHNAME_LENGTH];
 static char tempfile_pattern[POCL_MAX_PATHNAME_LENGTH];
@@ -599,7 +605,7 @@ pocl_cache_init_topdir ()
 
     strncpy (tempfile_pattern, cache_topdir, POCL_MAX_PATHNAME_LENGTH);
     size_t len = strlen (tempfile_pattern);
-    strncpy (tempfile_pattern + len, "/tempfile",
+    strncpy (tempfile_pattern + len, PATH_SEPARATOR "tempfile",
              (POCL_MAX_PATHNAME_LENGTH - len));
     tempfile_pattern[POCL_MAX_PATHNAME_LENGTH - 1] = 0;
     assert (strlen (tempfile_pattern) < POCL_MAX_PATHNAME_LENGTH);
@@ -608,13 +614,13 @@ pocl_cache_init_topdir ()
     if (use_kernel_cache)
       {
         bytes_written = snprintf (tempdir_pattern, POCL_MAX_PATHNAME_LENGTH,
-                                  "%s/tempdir", cache_topdir);
+                                  "%s" PATH_SEPARATOR "tempdir", cache_topdir);
         assert (bytes_written > 0 && bytes_written < POCL_MAX_PATHNAME_LENGTH);
       }
     else
       {
         bytes_written = snprintf (tempdir_pattern, POCL_MAX_PATHNAME_LENGTH,
-                                  "%s/_UNCACHED", cache_topdir);
+                                  "%s" PATH_SEPARATOR "_UNCACHED", cache_topdir);
         assert (bytes_written > 0 && bytes_written < POCL_MAX_PATHNAME_LENGTH);
       }
 

@@ -30,6 +30,10 @@
 
 #include "poclu.h"
 
+#ifdef _WIN32
+#  include "vccompat.hpp"
+#endif
+
 #define N 4
 
 #ifdef __cplusplus
