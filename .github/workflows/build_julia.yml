@@ -55,7 +55,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build pkg-config
 
-      - name: Install Julia dependencies
+      - name: Install PoCL dependencies
         run: |
           touch pocl/Project.toml
           julia --project=pocl --color=yes -e '
@@ -73,7 +73,7 @@ jobs:
             ])
 
             # versioned
-            Pkg.add(name="LLVM_full_jll", version="${{ matrix.llvm }}")
+            Pkg.add(name="LLVM_full_jll", version="${{ matrix.llvm }}")'
 
       - name: Build PoCL
         run: |
@@ -83,7 +83,7 @@ jobs:
                   OpenCL_jll, OpenCL_Headers_jll,
                   Hwloc_jll, CMake_jll
 
-            sourcedir = joinpath(@__DIR__, "pocl"
+            sourcedir = joinpath(@__DIR__, "pocl")
             builddir = joinpath(@__DIR__, "build")
             destdir = joinpath(@__DIR__, "target")
 
