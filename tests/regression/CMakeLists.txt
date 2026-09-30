@@ -40,6 +40,7 @@ set(C_PROGRAMS_TO_BUILD test_assign_loop_variable_to_privvar_makes_it_local
      test_localmem_load_across_barrier
      test_indirect_ptrs
      test_usm_indirect_ptrs
+     test_frexp_kernellib
 )
 if(UNIX)
   list(APPEND C_PROGRAMS_TO_BUILD test_signal_handlers)
@@ -190,6 +191,15 @@ add_test_pocl(NAME "regression/localmem_load_across_barrier" WORKITEM_HANDLER "l
 add_test_pocl(NAME "regression/test_indirect_ptrs" COMMAND "test_indirect_ptrs")
 
 add_test_pocl(NAME "regression/test_usm_indirect_ptrs" COMMAND "test_usm_indirect_ptrs")
+
+add_test_pocl(NAME "regression/frexp_kernellib" WORKITEM_HANDLER "loopvec" COMMAND "test_frexp_kernellib")
+# the sub-AVX2 kernel library variants, where llvm.frexp used to be miscompiled
+if(X86 AND KERNELLIB_HOST_DISTRO_VARIANTS)
+  foreach(KERNELLIB sse2 avx)
+    add_test_pocl(NAME "regression/frexp_kernellib_${KERNELLIB}" WORKITEM_HANDLER "loopvec"
+      COMMAND "test_frexp_kernellib" ${KERNELLIB})
+  endforeach()
+endif()
 
 add_test_pocl(NAME "regression/test_issue_893" COMMAND "test_issue_893")
 
