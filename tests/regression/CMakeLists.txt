@@ -42,6 +42,7 @@ set(C_PROGRAMS_TO_BUILD test_assign_loop_variable_to_privvar_makes_it_local
      test_usm_indirect_ptrs
      test_frexp_kernellib
      test_usm_free_realloc
+     test_large_private_workgroup
 )
 if(UNIX)
   list(APPEND C_PROGRAMS_TO_BUILD test_signal_handlers)
@@ -203,6 +204,10 @@ if(X86 AND KERNELLIB_HOST_DISTRO_VARIANTS)
 endif()
 
 add_test_pocl(NAME "regression/test_usm_free_realloc" COMMAND "test_usm_free_realloc" WORKITEM_HANDLER "loopvec")
+
+# Windows worker threads (std::thread) still get the default stack size
+add_test_pocl(NAME "regression/test_large_private_workgroup" LABELS "mingw_fail;win_fail"
+  COMMAND "test_large_private_workgroup")
 
 add_test_pocl(NAME "regression/test_issue_893" COMMAND "test_issue_893")
 
