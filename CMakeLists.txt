@@ -1046,7 +1046,8 @@ file(RELATIVE_PATH POCL_INSTALL_FROM_LIB_TO_PRIVATE_LIBDIR
 ######################################################################################
 
 set(HAVE_LIBSVML 0)
-if(X86)
+# oneAPI only ships SVML for x86-64; linking it into 32-bit kernels crashes them
+if(X86_64)
   set(ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
   # use static libraries, so that the poclbinary is independent of system
   set(CMAKE_FIND_LIBRARY_SUFFIXES .a)
